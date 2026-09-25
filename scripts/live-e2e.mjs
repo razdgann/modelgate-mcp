@@ -25,6 +25,12 @@ if (!KEY) {
   console.error("MODELGATE_KEY is required (use an integration-scoped key).");
   process.exit(2);
 }
+if (!/^mg_[A-Za-z0-9_-]{8,}$/.test(KEY)) {
+  console.error(
+    'MODELGATE_KEY is not a ModelGate key (expected "mg_…"). Replace the YOUR_MODELGATE_KEY placeholder with a real key from the ModelGate dashboard (API keys).',
+  );
+  process.exit(2);
+}
 
 const results = [];
 const record = (name, status, detail = "") => {
@@ -54,7 +60,15 @@ async function connect(key) {
   });
   transport.stderr?.on("data", (d) => (stderr += d));
   const client = new Client({ name: "modelgate-mcp-live-e2e", version: "1.0.0" });
-  await client.connect(transport);
+  try {
+    await client.connect(transport);
+  } catch (e) {
+    await new Promise((r) => setTimeout(r, 200)); // let the child's stderr drain
+    const why = stderr.trim();
+    throw new Error(`${e.message}${why ? `\nserver stderr:\n${why.split(key).join("[REDACTED]")}` : ""}`, {
+      cause: e,
+    });
+  }
   return { client, stderr: () => stderr };
 }
 
