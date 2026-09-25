@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "modelgate": {
+      "command": "npx",
+      "args": ["-y", "modelgate-mcp"],
+      "env": { "MODELGATE_KEY": "${env:MODELGATE_KEY}" }
+    }
+  }
+}

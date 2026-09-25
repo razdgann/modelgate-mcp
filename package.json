@@ -1,0 +1,100 @@
+{
+  "name": "modelgate-mcp",
+  "version": "0.1.0",
+  "description": "Official Model Context Protocol (MCP) server for ModelGate: run LLM inference through the ModelGate gateway and inspect models, usage, cost and request traces from Claude, Cursor, VS Code and any MCP client.",
+  "license": "MIT",
+  "author": {
+    "name": "ModelGate",
+    "email": "support@modelgatehq.com",
+    "url": "https://modelgatehq.com"
+  },
+  "homepage": "https://github.com/razdgann/modelgate-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/razdgann/modelgate-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/razdgann/modelgate-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "modelgate",
+    "llm",
+    "llm-gateway",
+    "openai",
+    "anthropic",
+    "gemini",
+    "observability",
+    "claude",
+    "cursor"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "modelgate-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/cli.ts",
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run --project unit --project integration",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "npm run build && vitest run --project e2e",
+    "test:live": "npm run build && node scripts/live-e2e.mjs",
+    "test:coverage": "vitest run --project unit --project integration --coverage",
+    "check:package": "publint --strict && attw --pack . --profile esm-only && node scripts/check-pack.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && npm run test:e2e && npm run check:package",
+    "prepublishOnly": "npm run verify"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.1.0",
+    "hono": "^4.13.9",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/client": "^2.1.0",
+    "@types/node": "^22.19.0",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.9",
+    "publint": "^0.3.24",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "inputs": [
+    { "type": "promptString", "id": "modelgate-key", "description": "ModelGate API key", "password": true }
+  ],
+  "servers": {
+    "modelgate": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "modelgate-mcp"],
+      "env": { "MODELGATE_KEY": "${input:modelgate-key}" }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+# Publishes modelgate-mcp to npm with provenance when a version tag is pushed.
+#
+# One-time setup (choose ONE):
+#   A) npm trusted publishing (recommended): on npmjs.com → modelgate-mcp →
+#      Settings → Trusted publishers → GitHub Actions, repository
+#      razdgann/modelgate-mcp, workflow release.yml. No secret needed.
+#   B) Token: add an npm automation token as the NPM_TOKEN repository secret.
+#
+# Release: bump package.json + src/version.ts, update CHANGELOG.md,
+# commit, `git tag vX.Y.Z && git push origin vX.Y.Z`.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm provenance / trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Tag matches package version
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+
+      - name: Verify
+        run: npm run verify
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
