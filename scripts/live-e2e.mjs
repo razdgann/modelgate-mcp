@@ -44,6 +44,15 @@ const errOf = (r) => {
     return { code: "unknown" };
   }
 };
+// Full error context: code, HTTP status, ModelGate request id, message.
+const describeErr = (r) => {
+  const e = errOf(r);
+  const meta = [
+    e.http_status && `HTTP ${e.http_status}`,
+    e.request_id && `request_id ${e.request_id}`,
+  ].filter(Boolean);
+  return `${e.code}${meta.length ? ` (${meta.join(", ")})` : ""}: ${e.message ?? ""}`;
+};
 
 async function connect(key) {
   let stderr = "";
@@ -95,7 +104,7 @@ else if (errOf(models).code === "endpoint_unavailable")
     "SKIP",
     "gateway lacks GET /v1/models (deploy the ModelGate integration API)",
   );
-else record("4. models retrieved", "FAIL", errOf(models).code);
+else record("4. models retrieved", "FAIL", describeErr(models));
 
 const chat = await s.client.callTool({
   name: "modelgate_chat",
@@ -111,7 +120,7 @@ const c = chat.structuredContent ?? {};
 record(
   "5. real chat request",
   chat.isError ? "FAIL" : "PASS",
-  chat.isError ? `${errOf(chat).code}: ${errOf(chat).message}` : JSON.stringify(c.content),
+  chat.isError ? describeErr(chat) : JSON.stringify(c.content),
 );
 
 const progress = [];
@@ -127,7 +136,7 @@ const sc = stream.structuredContent ?? {};
 record(
   "6. streaming",
   !stream.isError && sc.complete && progress.length > 0 ? "PASS" : "FAIL",
-  stream.isError ? errOf(stream).code : `${progress.length} progress notifications, complete=${sc.complete}`,
+  stream.isError ? describeErr(stream) : `${progress.length} progress notifications, complete=${sc.complete}`,
 );
 
 record(
@@ -135,14 +144,18 @@ record(
   c.usage?.total_tokens > 0 ? "PASS" : "FAIL",
   JSON.stringify(c.usage ?? null),
 );
+// ModelGate returns and records x-modelgate-request-id on failures too, so the
+// id, attribution and observability checks still run when the provider call
+// itself failed (e.g. a bad provider credential in the project).
+const requestId = c.request_id ?? (chat.isError ? errOf(chat).request_id : undefined);
 record(
   "8. ModelGate request id returned",
-  typeof c.request_id === "string" && c.request_id.length > 8 ? "PASS" : "FAIL",
-  c.request_id ?? "none",
+  typeof requestId === "string" && requestId.length > 8 ? "PASS" : "FAIL",
+  `${requestId ?? "none"}${chat.isError && requestId ? " (from the failed call)" : ""}`,
 );
 
-if (c.request_id) {
-  const rec = await s.client.callTool({ name: "modelgate_request", arguments: { request_id: c.request_id } });
+if (requestId) {
+  const rec = await s.client.callTool({ name: "modelgate_request", arguments: { request_id: requestId } });
   outputs.push(rec);
   if (rec.isError && errOf(rec).code === "endpoint_unavailable") {
     record(
@@ -150,13 +163,9 @@ if (c.request_id) {
       "SKIP",
       "gateway lacks GET /v1/requests/:id — verify source=mcp in the dashboard Requests view",
     );
-    record(
-      "10. request visible in observability",
-      "SKIP",
-      `look up ${c.request_id} in the ModelGate dashboard`,
-    );
+    record("10. request visible in observability", "SKIP", `look up ${requestId} in the ModelGate dashboard`);
   } else if (rec.isError) {
-    record("9-10. request lookup", "FAIL", errOf(rec).code);
+    record("9-10. request lookup", "FAIL", describeErr(rec));
   } else {
     const r = rec.structuredContent;
     record(
@@ -166,13 +175,19 @@ if (c.request_id) {
         source: r.source,
         integration: r.metadata?.integration,
         mcp_client: r.metadata?.mcp_client,
-        correlation_id: r.metadata?.correlation_id === c.correlation_id,
+        // The local correlation id is only returned on success.
+        ...(c.correlation_id
+          ? { correlation_id_matches: r.metadata?.correlation_id === c.correlation_id }
+          : {}),
       }),
     );
+    // The record must exist and reflect the real outcome: OK for a successful
+    // call, a non-OK status (with its error code) for a failed one.
+    const consistent = chat.isError ? r.status !== "OK" : r.status === "OK";
     record(
       "10. request visible in observability",
-      r.status === "OK" ? "PASS" : "FAIL",
-      `status=${r.status} tokens=${r.usage?.total_tokens} cost=$${r.cost_usd} latency=${r.latency_ms}ms`,
+      consistent ? "PASS" : "FAIL",
+      `status=${r.status}${r.error?.code ? ` error=${r.error.code}` : ""} tokens=${r.usage?.total_tokens} cost=$${r.cost_usd} latency=${r.latency_ms}ms`,
     );
   }
 }
@@ -188,7 +203,7 @@ else
   record(
     "   usage report",
     errOf(usage).code === "endpoint_unavailable" ? "SKIP" : "FAIL",
-    errOf(usage).code,
+    describeErr(usage),
   );
 await s.client.close();
 
