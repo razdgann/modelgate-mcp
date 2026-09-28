@@ -72,11 +72,18 @@ serveStdio(createServerFactory({ config, logger: createLogger({ level: "info" })
 Publishing is automated by `.github/workflows/release.yml` and runs when a `v*` tag is pushed. It
 runs `npm run verify` and then `npm publish --provenance --access public`.
 
-One-time setup, choosing one of:
+Requirements: the GitHub repository must be **public** (npm only generates provenance for public
+source repositories), and the publishing npm account is `modelgate`.
 
-- **Trusted publishing (recommended):** on npmjs.com, add this repository and workflow
-  (`release.yml`) as a trusted publisher for `modelgate-mcp`. No token is needed.
-- **Token:** add an npm automation token as the `NPM_TOKEN` repository secret.
+One-time setup:
+
+1. **First release (token):** the package does not exist on npm yet, so trusted publishing cannot
+   be configured. Create a granular access token on npmjs.com (read and write for packages, with
+   "bypass 2FA" enabled, 7-day expiry) and store it as the `NPM_TOKEN` repository secret.
+2. **After the first release (trusted publishing):** on npmjs.com, open `modelgate-mcp` →
+   Settings → Trusted publisher → GitHub Actions. Enter organization `razdgann`, repository
+   `modelgate-mcp`, workflow `release.yml` and environment `npm`. Then delete the `NPM_TOKEN`
+   secret and revoke the token. The workflow then authenticates via OIDC with no stored secret.
 
 To release:
 
